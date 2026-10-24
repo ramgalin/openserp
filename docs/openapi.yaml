@@ -26,6 +26,48 @@ tags:
   - name: Docs
     description: OpenAPI and Swagger UI endpoints
 paths:
+  /context:
+    post:
+      tags: [Search]
+      operationId: buildAgentContext
+      summary: Build source-backed context for an AI agent
+      description: >
+        Searches the main question and up to four caller-provided variants,
+        fuses organic results by reciprocal rank, fetches unique pages, and
+        selects passages using lexical coverage of the main question.
+        No LLM is used. Up to three searches and two fetches run concurrently.
+        The shared wall-clock deadline uses the server MegaTimeout (90s by default).
+        max_tokens bounds only the context string, including citation headers,
+        using cl100k_base; the JSON envelope is outside this budget. Source spans
+        are zero-based, end-exclusive UTF-8 byte offsets in the exact extracted
+        Markdown identified by content_sha256, not offsets in original HTML.
+        Sources are fetched on each call and are not persisted by this endpoint.
+        Extracted Markdown is capped at 2 MiB per page; oversized documents fail
+        that fetch. Source titles are limited to 512 Unicode characters.
+        Failed searches or fetches produce partial=true; an empty context also
+        has partial=true. A successful HTTP response does not imply completeness.
+      parameters:
+        - $ref: "#/components/parameters/UseProxyHeader"
+        - $ref: "#/components/parameters/ProxyURLHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContextRequest"
+      responses:
+        "200":
+          description: Selected evidence, including partial or empty results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContextResponse"
+        "400":
+          description: Invalid JSON, unknown fields, unsupported engine, or invalid limits
+        "404":
+          description: Extraction is disabled
+        "500":
+          description: Context assembly failed
   /{engine}/search:
     get:
       tags: [Search]
@@ -1236,6 +1278,159 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
   schemas:
+    ContextRequest:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          description: Main question used for passage ranking; 1..2000 UTF-8 bytes after trimming
+        queries:
+          type: array
+          maxItems: 4
+          description: Additional search variants; duplicates are removed case-insensitively
+          items:
+            type: string
+            minLength: 1
+            description: 1..2000 UTF-8 bytes after trimming
+        engines:
+          type: array
+          maxItems: 3
+          description: Defaults to the first two configured engines; each search requests 10 results per engine
+          items:
+            type: string
+            enum: [google, bing, yandex, baidu, duck, duckduckgo, ecosia]
+        lang:
+          type: string
+          maxLength: 32
+        region:
+          type: string
+          maxLength: 128
+        extract_mode:
+          type: string
+          enum: [auto, fast, rendered]
+          description: Defaults to server extraction mode
+        max_sources:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+        max_fetches:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 8
+          description: Maximum unique page fetch attempts; must be at least max_sources. When omitted defaults to max(8, max_sources).
+        max_tokens:
+          type: integer
+          minimum: 256
+          maximum: 32000
+          default: 6000
+          description: cl100k_base token budget for context, including citation headers
+    ContextResponse:
+      type: object
+      required: [query, queries, context, sources, citations, failures, partial, truncated, usage, meta]
+      properties:
+        query:
+          type: string
+        queries:
+          type: array
+          items:
+            type: string
+          description: All searched formulations, including the main query
+        context:
+          type: string
+          description: Agent-ready passages with [cN] citation markers, titles and source URLs
+        sources:
+          type: array
+          items:
+            type: object
+            required: [id, url, title, fetched_at, content_sha256]
+            properties:
+              id:
+                type: string
+              url:
+                type: string
+              title:
+                type: string
+              fetched_at:
+                type: string
+              content_sha256:
+                type: string
+        citations:
+          type: array
+          items:
+            type: object
+            required: [id, source_id, excerpt, source_span, score, truncated]
+            properties:
+              id:
+                type: string
+              source_id:
+                type: string
+              excerpt:
+                type: string
+              source_span:
+                type: object
+                required: [start, end]
+                properties:
+                  start:
+                    type: integer
+                    minimum: 0
+                  end:
+                    type: integer
+                    minimum: 0
+              score:
+                type: number
+                description: Lexical query coverage plus reciprocal-rank score; not a probability or verification of truth
+              truncated:
+                type: boolean
+        failures:
+          type: array
+          items:
+            type: object
+            required: [stage, code]
+            properties:
+              stage:
+                type: string
+                enum: [search, fetch]
+              query:
+                type: string
+              url:
+                type: string
+              code:
+                type: string
+        partial:
+          type: boolean
+        truncated:
+          type: boolean
+          description: A passage was clipped or omitted by the token budget; page/source/passage selection limits are separate
+        usage:
+          type: object
+          required: [tokenizer, context_tokens, max_tokens, searches, fetches]
+          properties:
+            tokenizer:
+              type: string
+              enum: [cl100k_base]
+            context_tokens:
+              type: integer
+            max_tokens:
+              type: integer
+            searches:
+              type: integer
+              description: Search callbacks started, each spanning the requested engines
+            fetches:
+              type: integer
+              description: Unique page fetch callbacks started
+        meta:
+          type: object
+          required: [request_id, took_ms]
+          properties:
+            request_id:
+              type: string
+            took_ms:
+              type: integer
     # ── v2 envelope ──────────────────────────────────────────────────
     QueryEcho:
       type: object

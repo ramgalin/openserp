@@ -19,6 +19,7 @@ No API keys, no per-search billing: one command gives you live, structured searc
 - Dedicated endpoints for six engines, same JSON schema across all of them
 - **Megasearch** - one query across several engines at once, merged and deduped
 - **URL extraction** - search results plus clean markdown of the target pages in one call
+- **Agent context** - multi-query search and relevant source-backed passages within an exact token budget (`POST /context`, self-hosted API)
 - SERP features: AI summaries, answer boxes, people-also-ask, related searches
 - Image search, filters (language, date range, file type, site), **JSON/Markdown/Text/NdJSON** output
 - Proxies, cache, resilient mode, prebuilt Docker images
@@ -183,6 +184,42 @@ const { results } = await client.search({ engine: "google", text: "openserp", li
 ```
 
 ## Search Endpoints
+
+### Context for AI agents (self-hosted)
+
+`POST /context` searches a question and optional variants, merges duplicate URLs,
+reads the best candidates, and selects relevant passages without an LLM:
+
+```bash
+curl -X POST http://127.0.0.1:7000/context \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"PostgreSQL logical replication restrictions","queries":["PostgreSQL logical replication DDL sequences"],"engines":["google","bing"],"max_sources":5,"max_fetches":8,"max_tokens":6000}'
+```
+
+Pass the response's `context` string to your agent. It contains `[c1]` citation
+markers, titles, URLs, and verbatim excerpts. `sources` supplies retrieval dates
+and document hashes; `citations` links each excerpt to zero-based, end-exclusive
+UTF-8 byte offsets in the exact extracted **Markdown**, not the original HTML.
+The endpoint does not persist the fetched documents.
+
+`max_tokens` is measured with `cl100k_base` and includes all text in `context`,
+including source headers. The surrounding JSON and your agent's prompt are outside
+this budget; other model tokenizers may count differently. `truncated` signals
+token-budget clipping. `partial` signals search/fetch failures or no usable
+evidence; inspect `failures` even on HTTP 200.
+
+Defaults: main query plus up to 4 additional variants, first 2 configured engines
+(up to 3 explicit engines), 10 search results per engine, at most 8 unique fetch
+attempts, 5 cited sources, and 6000 output tokens. Hard caps are 20 fetch attempts,
+10 sources, and 32000 tokens. Up to 3 query variants and 2 pages run concurrently;
+the shared deadline uses `MegaTimeout`. Selection uses reciprocal-rank fusion
+and lexical passage coverage, with at most 3 passages per source. It does not
+generate an answer or verify the truth of source text.
+
+This endpoint is currently available in the self-hosted engine. Cloud billing,
+SDK convenience methods, and a dedicated MCP tool are separate integrations.
+
+### Per-engine search
 
 Available engine names: `google`, `yandex`, `baidu`, `bing`, `duckduckgo`, `ecosia`.
 

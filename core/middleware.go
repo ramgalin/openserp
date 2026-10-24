@@ -65,10 +65,11 @@ func RequestContextMiddleware() fiber.Handler {
 
 // RequestTimeoutMiddleware bounds wall-clock time per request by attaching a
 // deadline to the user context, which fasthttp never cancels on client
-// disconnect. /mega/* (MegaTimeout) and /extract* (batch budget) are exempt.
+// disconnect. /mega/* and /context (MegaTimeout), and /extract* (batch budget)
+// manage their own deadlines.
 func RequestTimeoutMiddleware(timeout time.Duration) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		if strings.HasPrefix(c.Path(), "/mega/") || c.Path() == "/extract" || c.Path() == "/extract/batch" {
+		if strings.HasPrefix(c.Path(), "/mega/") || c.Path() == "/extract" || c.Path() == "/extract/batch" || c.Path() == "/context" {
 			return c.Next()
 		}
 		ctx, cancel := context.WithTimeout(c.UserContext(), timeout)
