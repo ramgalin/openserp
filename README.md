@@ -216,6 +216,11 @@ the shared deadline uses `MegaTimeout`. Selection uses reciprocal-rank fusion
 and lexical passage coverage, with at most 3 passages per source. It does not
 generate an answer or verify the truth of source text.
 
+Passage ranking uses visible link labels rather than URL destinations. Common
+navigation, feedback, newsletter, cookie-consent and copyright blocks are
+excluded before chunking. This is a heuristic filter, not a guarantee that every
+site's boilerplate is removed; citation spans still address untouched Markdown.
+
 This endpoint is currently available in the self-hosted engine. Cloud billing,
 SDK convenience methods, and a dedicated MCP tool are separate integrations.
 
