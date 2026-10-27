@@ -251,7 +251,7 @@ func Build(ctx context.Context, req Request, search SearchFunc, fetch FetchFunc)
 			continue
 		}
 		for _, span := range splitPassages(doc.Markdown) {
-			textTerms := words(doc.Markdown[span.Start:span.End])
+			textTerms := words(visiblePassageText(doc.Markdown[span.Start:span.End]))
 			matched := 0
 			for term := range terms {
 				if textTerms[term] {
@@ -404,6 +404,13 @@ func splitPassages(text string) []Span {
 		end := len(text)
 		if n := strings.Index(text[start:], "\n\n"); n >= 0 {
 			end = start + n
+		}
+		// Filter complete paragraphs before chunking so a long feedback or
+		// consent block cannot leave an apparently useful tail. Offsets still
+		// refer to the original, unmodified document.
+		if servicePassage(text[start:end]) {
+			start = end + 2
+			continue
 		}
 		partStart := start
 		count := 0
