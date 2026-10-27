@@ -33,6 +33,7 @@ func TestRequestTimeoutMiddlewareSetsDeadlineExceptBudgetedPaths(t *testing.T) {
 	app.Get("/mega/search", record("/mega/search"))
 	app.Get("/extract", record("/extract"))
 	app.Post("/extract/batch", record("/extract/batch"))
+	app.Post("/context", record("/context"))
 
 	for path, method := range map[string]string{
 		"/google/search": http.MethodGet,
@@ -40,6 +41,7 @@ func TestRequestTimeoutMiddlewareSetsDeadlineExceptBudgetedPaths(t *testing.T) {
 		"/mega/search":   http.MethodGet,
 		"/extract":       http.MethodGet,
 		"/extract/batch": http.MethodPost,
+		"/context":       http.MethodPost,
 	} {
 		req := httptest.NewRequest(method, path, nil)
 		resp, err := app.Test(req, -1)
@@ -57,6 +59,7 @@ func TestRequestTimeoutMiddlewareSetsDeadlineExceptBudgetedPaths(t *testing.T) {
 		"/mega/search":   false,
 		"/extract":       false,
 		"/extract/batch": false,
+		"/context":       false,
 	} {
 		if deadlines[path] != want {
 			t.Errorf("%s: deadline attached = %v, want %v", path, deadlines[path], want)

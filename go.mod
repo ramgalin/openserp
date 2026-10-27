@@ -19,6 +19,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.20.1
+	github.com/tiktoken-go/tokenizer v0.6.2
 	github.com/ysmood/gson v0.7.3
 	golang.org/x/net v0.50.0
 	golang.org/x/time v0.14.0
@@ -36,6 +37,7 @@ require (
 	github.com/bogdanfinn/quic-go-utls v1.0.9-utls // indirect
 	github.com/bogdanfinn/utls v1.7.7-barnius // indirect
 	github.com/bogdanfinn/websocket v1.5.5-barnius // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/elliotchance/pie/v2 v2.9.0 // indirect
 	github.com/forPelevin/gomoji v1.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect

@@ -236,6 +236,7 @@ func NewServerWithOptions(host string, port int, opts ServerOptions, searchEngin
 	serv.app.Get("/extract", serv.handleExtract)
 	serv.app.Post("/extract", serv.handleExtract)
 	serv.app.Post("/extract/batch", serv.handleBatchExtract)
+	serv.app.Post("/context", serv.handleContext)
 
 	return &serv
 }
